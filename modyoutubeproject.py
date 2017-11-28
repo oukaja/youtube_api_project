@@ -8,6 +8,12 @@ import re
 from nltk.corpus import stopwords
 from pandas import DataFrame
 import matplotlib.pyplot as plt
+from pymongo import MongoClient
+
+# MongoDB Connection
+client = MongoClient('mongodb://localhost:27017/')
+db = client['modyoutubeproject']
+collection = db['commentaires']
 
 # YouTube api key
 api_key = "AIzaSyDt0lPqnHIgW8wcEI_Xzt5ifdYRAivn2og"
@@ -83,6 +89,16 @@ def commentaire_vers_mongodb():
     commentaires = list()
     for snippet_c_user in snippet_c:
         commentaires.append(snippet_c_user["topLevelComment"]["snippet"]["textDisplay"])
+    commentaires = (nettoyer_la_phrase(p) for p in commentaires)
+    for commentaire in commentaires:
+        comment = {"comment": commentaire}
+        collection.insert(comment)
+
+
+def commentaire_de_mongodb():
+    col = db.get_collection("commentaires")
+    for document in col.find({}):
+        print(document['comment'])
 
 
 def video_info_comments():
@@ -220,6 +236,43 @@ def frequence_par_terme_en_entree(terme=" "):
     print("moyenne cette expression est citée dans un commentaire " + str(freq / int(MAX_RESULT)))
 
 
+# Q5
+def proba_conditionnel_A_sachant_B(A="", B=""):
+    # on considere que A et B sont deux evenements independants
+    commentaires = list()
+    for snippet_c_user in snippet_c:
+        commentaires.append(snippet_c_user["topLevelComment"]["snippet"]["textDisplay"])
+    commentaires = (nettoyer_la_phrase(p) for p in commentaires)
+    commentaires_dans_une_ligne = TextBlob(' '.join(commentaires))
+    # print(commentaires_dans_une_ligne.noun_phrases)
+    feature_count = dict()
+    for phrase in commentaires_dans_une_ligne.noun_phrases:
+        count = 0
+        for word in phrase.split():
+            if word not in stopwords.words('english'):
+                count += commentaires_dans_une_ligne.words.count(word)
+        # print(phrase + ": " + str(count))
+        feature_count[phrase] = count
+    df = DataFrame().from_dict(list(feature_count.items()))
+    df.columns = ['termes', 'frequence']
+    df.sort_values('frequence', ascending=False, inplace=True)
+    # print(df.items)
+    freq_A = 0
+    for index, row in df.iterrows():
+        if row["termes"] == A or row["termes"] in A or A in row["termes"]:
+            freq_A += int(row["frequence"])
+    freq_B = 0
+    for index, row in df.iterrows():
+        if row["termes"] == B or row["termes"] in B or B in row["termes"]:
+            freq_B += int(row["frequence"])
+    if freq_A == 0:
+        print("proba de B sachant A vaut : ", str("{0:.2f}".format(freq_B / df.size)))
+    else:
+        # print("proba de B", str("{0:.2f}".format(freq_B / df.size)))
+        prob_AB = (freq_B / df.size) * (freq_A / df.size)
+        print("proba de B sachant A vaut : ", str("{0:.2f}".format(prob_AB / (freq_A / df.size))))
+
+
 # Q6
 def pourcentage_sexe():
     f = 0
@@ -251,4 +304,7 @@ if __name__ == "__main__":
     # dix_termes_les_plus_frequent()
     # frequence_par_terme_en_entree(terme="new youtube channelfor")
     # pourcentage_sexe()
-    print(1)
+    # commentaire_vers_mongodb()
+    # commentaire_de_mongodb()
+    proba_conditionnel_A_sachant_B(A="youtube", B="videos")
+    # print(1)
