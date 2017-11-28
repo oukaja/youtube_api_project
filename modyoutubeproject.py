@@ -9,6 +9,7 @@ from nltk.corpus import stopwords
 from pandas import DataFrame
 import matplotlib.pyplot as plt
 from pymongo import MongoClient
+import string
 
 # MongoDB Connection
 client = MongoClient('mongodb://localhost:27017/')
@@ -24,8 +25,15 @@ gendre = GendreAPI("http://api.namsor.com/onomastics/api/json/gendre")
 # Video id
 VIDEO_ID = "mn6Ia5e_suY"
 
+
+# set id video
+def id_video(id=""):
+    global VIDEO_ID
+    VIDEO_ID = id
+
+
 # Max Results
-MAX_RESULT = "10"
+MAX_RESULT = "50"
 
 # get all info of videos
 video_info = []
@@ -36,39 +44,43 @@ video_comments = []
 # get all comments replies
 video_comments_replies = []
 
-# Google API
-url_video_comments = "https://www.googleapis.com/youtube/v3/commentThreads?key=%s&textFormat=plainText&part=snippet,replies&videoId=%s&maxResults=%s" % (
-    api_key,
-    VIDEO_ID,
-    MAX_RESULT)
-url_video_info = "https://www.googleapis.com/youtube/v3/videos?key=%s&part=snippet,contentDetails,statistics&id=%s&maxResults=%s" % (
-    api_key,
-    VIDEO_ID,
-    MAX_RESULT)
-
-# get Data
-video_info = requests.get(url_video_info).json()
-video_comments = requests.get(url_video_comments).json()
-
-for i in range(0, len(video_info["items"])):
-    video_item = video_info["items"]
-    try:
-        snippet = video_item[i]["snippet"]
-        contentDetails = video_item[i]["contentDetails"]
-        statistics = video_item[i]["statistics"]
-    except:
-        continue
-
 snippet_c = list()
 snippet_c_replies = list()
 
-for i in range(0, len(video_comments["items"])):
-    video_comment_item = video_comments["items"]
-    try:
-        snippet_c.append(video_comment_item[i]["snippet"])
-        snippet_c_replies.append(video_comment_item[i]["replies"]["comments"])
-    except:
-        continue
+snippet = ""
+contentDetails = ""
+statistics = ""
+
+
+def recharger_les_donnees():
+    global snippet, contentDetails, statistics, video_info, video_comments
+    # Google API
+    url_video_comments = "https://www.googleapis.com/youtube/v3/commentThreads?key=%s&textFormat=plainText&part=snippet,replies&videoId=%s&maxResults=%s" % (
+        api_key,
+        VIDEO_ID,
+        MAX_RESULT)
+    url_video_info = "https://www.googleapis.com/youtube/v3/videos?key=%s&part=snippet,contentDetails,statistics&id=%s&maxResults=%s" % (
+        api_key,
+        VIDEO_ID,
+        MAX_RESULT)
+    # get Data
+    video_info = requests.get(url_video_info).json()
+    video_comments = requests.get(url_video_comments).json()
+    for i in range(0, len(video_info["items"])):
+        video_item = video_info["items"]
+        try:
+            snippet = video_item[i]["snippet"]
+            contentDetails = video_item[i]["contentDetails"]
+            statistics = video_item[i]["statistics"]
+        except:
+            continue
+    for i in range(0, len(video_comments["items"])):
+        video_comment_item = video_comments["items"]
+        try:
+            snippet_c.append(video_comment_item[i]["snippet"])
+            snippet_c_replies.append(video_comment_item[i]["replies"]["comments"])
+        except:
+            continue
 
 
 def nettoyer_la_phrase(phrase):
@@ -168,7 +180,7 @@ def video_info_comments():
 
 # Q1
 def nombre_de_commentaire():
-    print("nombre de commentaire : " + statistics["commentCount"])
+    print("nombre de commentaire : " + str(statistics["commentCount"]))
 
 
 # Q2
@@ -232,8 +244,8 @@ def frequence_par_terme_en_entree(terme=" "):
         if row["termes"] == terme or row["termes"] in terme or terme in row["termes"]:
             # print(row["termes"], row["frequence"])
             freq += int(row["frequence"])
-    print("fréquence dans le dataset traité ", str(freq))
-    print("moyenne cette expression est citée dans un commentaire " + str(freq / int(MAX_RESULT)))
+    print("a - fréquence dans le dataset traité ", str(freq))
+    print("b - moyenne cette expression est citée dans un commentaire " + str(freq / int(MAX_RESULT)))
 
 
 # Q5
@@ -257,6 +269,9 @@ def proba_conditionnel_A_sachant_B(A="", B=""):
     df.columns = ['termes', 'frequence']
     df.sort_values('frequence', ascending=False, inplace=True)
     # print(df.items)
+    cumule_freq = 0
+    for index, row in df.iterrows():
+        cumule_freq += int(row["frequence"])
     freq_A = 0
     for index, row in df.iterrows():
         if row["termes"] == A or row["termes"] in A or A in row["termes"]:
@@ -266,11 +281,10 @@ def proba_conditionnel_A_sachant_B(A="", B=""):
         if row["termes"] == B or row["termes"] in B or B in row["termes"]:
             freq_B += int(row["frequence"])
     if freq_A == 0:
-        print("proba de B sachant A vaut : ", str("{0:.2f}".format(freq_B / df.size)))
+        print("proba de B sachant A vaut : ", str("{0:.2f}".format(freq_B / cumule_freq)))
     else:
-        # print("proba de B", str("{0:.2f}".format(freq_B / df.size)))
-        prob_AB = (freq_B / df.size) * (freq_A / df.size)
-        print("proba de B sachant A vaut : ", str("{0:.2f}".format(prob_AB / (freq_A / df.size))))
+        prob_AB = (freq_B / df.size) * (freq_A / cumule_freq)
+        print("proba de B sachant A vaut : ", str("{0:.2f}".format(prob_AB / (freq_A / cumule_freq))))
 
 
 # Q6
@@ -279,12 +293,17 @@ def pourcentage_sexe():
     u = 0
     m = 0
     reel = 0
+    x = ""
     for snippet_c_user in snippet_c:
         result = ''.join(
             [i for i in nettoyer_la_phrase(snippet_c_user["topLevelComment"]["snippet"]["authorDisplayName"]) if
              not i.isdigit()])
-        # print(result.split(" ", 1)[0] + " " + result.split(" ", 1)[1].replace(" ", "").replace(".", ""))
-        resp = gendre(result.split(" ", 1)[0], result.split(" ", 1)[1].replace(" ", "").replace(".", "")).GET()
+        if result.split(" ", 1)[1].replace(" ", "").replace(".", "") != "":
+            x = result.split(" ", 1)[1].replace(" ", "").replace(".", "")
+        else:
+            x = "v"
+        # print(result.split(" ", 1)[0].replace(".","") + " " + x)
+        resp = gendre(result.split(" ", 1)[0].replace(".", ""), x).GET()
         # print(resp.json().get('gender'))
         if resp.json().get('gender') == "female":
             f += 1
@@ -299,12 +318,12 @@ def pourcentage_sexe():
 
 
 if __name__ == "__main__":
+    id_video(id="hDJdkcdG1iA")
+    recharger_les_donnees()
     # nombre_de_commentaire()
     # commentaire_le_plus_populaire_du_premier_Q1()
     # dix_termes_les_plus_frequent()
-    # frequence_par_terme_en_entree(terme="new youtube channelfor")
-    # pourcentage_sexe()
-    # commentaire_vers_mongodb()
-    # commentaire_de_mongodb()
-    proba_conditionnel_A_sachant_B(A="youtube", B="videos")
+    # frequence_par_terme_en_entree(terme="video")
+    # proba_conditionnel_A_sachant_B(A="video", B="business intelligence")
+    pourcentage_sexe()
     # print(1)
