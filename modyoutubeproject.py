@@ -1,15 +1,18 @@
 # dependencies
+from __future__ import unicode_literals
 import isodate
 import requests
 from hammock import Hammock as GendreAPI
 from textblob import TextBlob
 from string import punctuation
+from collections import Counter
 import re
 from nltk.corpus import stopwords
+from nltk import word_tokenize
+from nltk.util import ngrams
 from pandas import DataFrame
 import matplotlib.pyplot as plt
 from pymongo import MongoClient
-import string
 
 # MongoDB Connection
 client = MongoClient('mongodb://localhost:27017/')
@@ -198,8 +201,8 @@ def commentaire_le_plus_populaire_du_premier_Q1():
     print("Texte  : " + commentaire)
 
 
-# Q3
-def dix_termes_les_plus_frequent():
+# Q3 PHRASE NOMINAL
+def dix_phrase_nominal_les_plus_frequent():
     commentaires = list()
     for snippet_c_user in snippet_c:
         commentaires.append(snippet_c_user["topLevelComment"]["snippet"]["textDisplay"])
@@ -215,6 +218,47 @@ def dix_termes_les_plus_frequent():
         # print(phrase + ": " + str(count))
         feature_count[phrase] = count
     df = DataFrame().from_dict(list(feature_count.items()))
+    df.columns = ['termes', 'frequence']
+    df.sort_values('frequence', ascending=False, inplace=True)
+    plt.style.use('ggplot')
+    df.head(n=10).plot(x='termes', y='frequence', kind='bar')
+    plt.show()
+
+
+# Q3 TERME
+def dix_terme_les_plus_frequent():
+    comments = commentaire_de_mongodb()
+    comments = (nettoyer_la_phrase(p) for p in comments)
+    s = ""
+    for c in comments:
+        s += " " + c.replace(".", " ")
+    filtered_words = [word for word in s.split() if word not in stopwords.words('english')]
+    wordcount = Counter(filtered_words)
+    df = DataFrame.from_dict(wordcount, orient='index').reset_index().rename(
+        columns={'index': 'termes', 0: 'frequence'})  # .set_index('word')
+    df.sort_values('frequence', ascending=False, inplace=True)
+    # print(df)
+    plt.style.use('ggplot')
+    df.head(n=10).plot(x='termes', y='frequence', kind='bar')
+    plt.show()
+
+
+# Q3 N-GRAMS
+def dix_ngrams_les_plus_frequent():
+    comments = commentaire_de_mongodb()
+    comments = (nettoyer_la_phrase(p) for p in comments)
+    wordcount = dict()
+    for c in comments:
+        token = word_tokenize(c.replace(".", ""))
+        bigrams = ngrams(token, 2)
+        for gram in bigrams:
+            g = gram[0] + " " + gram[1]
+            if g not in wordcount:
+                wordcount[g] = 1
+            else:
+                wordcount[g] += 1
+    # print(wordcount)
+    df = DataFrame().from_dict(list(wordcount.items()))
     df.columns = ['termes', 'frequence']
     df.sort_values('frequence', ascending=False, inplace=True)
     plt.style.use('ggplot')
@@ -320,11 +364,12 @@ def pourcentage_sexe():
 
 
 if __name__ == "__main__":
-    id_video(id="KGXQKzH3Q74")
-    nombre_de_commentaire()
+    # id_video(id="cpPG0bKHYKc")
+    # nombre_de_commentaire()
     # commentaire_le_plus_populaire_du_premier_Q1()
-    # dix_termes_les_plus_frequent()
+    # dix_terme_les_plus_frequent()
     # frequence_par_terme_en_entree(terme="video")
     # proba_conditionnel_A_sachant_B(A="video", B="business intelligence")
-    pourcentage_sexe()
+    # pourcentage_sexe()
     # print(1)
+    dix_ngrams_les_plus_frequent()
