@@ -25,13 +25,6 @@ gendre = GendreAPI("http://api.namsor.com/onomastics/api/json/gendre")
 # Video id
 VIDEO_ID = "mn6Ia5e_suY"
 
-
-# set id video
-def id_video(id=""):
-    global VIDEO_ID
-    VIDEO_ID = id
-
-
 # Max Results
 MAX_RESULT = "50"
 
@@ -50,6 +43,14 @@ snippet_c_replies = list()
 snippet = ""
 contentDetails = ""
 statistics = ""
+
+
+# set id video
+def id_video(id=""):
+    global VIDEO_ID
+    VIDEO_ID = id
+    recharger_les_donnees()
+    commentaire_vers_mongodb()
 
 
 def recharger_les_donnees():
@@ -108,9 +109,11 @@ def commentaire_vers_mongodb():
 
 
 def commentaire_de_mongodb():
+    comments = list()
     col = db.get_collection("commentaires")
     for document in col.find({}):
-        print(document['comment'])
+        comments.append(document['comment'])
+    return comments
 
 
 def video_info_comments():
@@ -292,7 +295,6 @@ def pourcentage_sexe():
     f = 0
     u = 0
     m = 0
-    reel = 0
     x = ""
     for snippet_c_user in snippet_c:
         result = ''.join(
@@ -302,28 +304,27 @@ def pourcentage_sexe():
             x = result.split(" ", 1)[1].replace(" ", "").replace(".", "")
         else:
             x = "v"
-        # print(result.split(" ", 1)[0].replace(".","") + " " + x)
         resp = gendre(result.split(" ", 1)[0].replace(".", ""), x).GET()
-        # print(resp.json().get('gender'))
         if resp.json().get('gender') == "female":
             f += 1
         elif resp.json().get('gender') == "unknown":
             u += 1
         else:
             m += 1
-    reel = f + m - u
-    pourcentage = float("{0:.2f}".format((f / (int(MAX_RESULT) - u)) * 100))
-    print("pourcentage des commentaires publiés par les femmes : " + str(pourcentage) + "%")
-    print("pourcentage des commentaires publiés par les hommes : " + str(100 - pourcentage) + "%")
+    pourcentagef = float("{0:.2f}".format((f / (int(MAX_RESULT))) * 100))
+    pourcentagem = float("{0:.2f}".format((m / (int(MAX_RESULT))) * 100))
+    pourcentageu = float("{0:.2f}".format((u / (int(MAX_RESULT))) * 100))
+    print("pourcentage des commentaires publiés par les femmes : " + str(pourcentagef) + "%")
+    print("pourcentage des commentaires publiés par les hommes : " + str(100 - pourcentagem) + "%")
+    print("pourcentage des commentaires publiés par les inconnus : " + str(100 - pourcentageu) + "%")
 
 
 if __name__ == "__main__":
-    id_video(id="hDJdkcdG1iA")
-    recharger_les_donnees()
+    id_video(id="KGXQKzH3Q74")
     nombre_de_commentaire()
-    commentaire_le_plus_populaire_du_premier_Q1()
-    dix_termes_les_plus_frequent()
-    frequence_par_terme_en_entree(terme="video")
-    proba_conditionnel_A_sachant_B(A="video", B="business intelligence")
+    # commentaire_le_plus_populaire_du_premier_Q1()
+    # dix_termes_les_plus_frequent()
+    # frequence_par_terme_en_entree(terme="video")
+    # proba_conditionnel_A_sachant_B(A="video", B="business intelligence")
     pourcentage_sexe()
     # print(1)
