@@ -13,6 +13,9 @@ from nltk.util import ngrams
 from pandas import DataFrame
 import matplotlib.pyplot as plt
 from pymongo import MongoClient
+import seaborn as sns
+
+sns.set(color_codes=True)
 
 # MongoDB Connection
 client = MongoClient('mongodb://localhost:27017/')
@@ -363,6 +366,19 @@ def pourcentage_sexe():
     print("pourcentage des commentaires publiés par les inconnus : " + str(100 - pourcentageu) + "%")
 
 
+def sentiment_polarity_pour_chaque_commentaire():
+    result = commentaire_de_mongodb()
+    sentiment_scores = list()
+    i = 0
+    for sentence in result:
+        line = TextBlob(sentence)
+        sentiment_scores.append(line.sentiment.polarity)
+        if i <= 10:
+            # print(sentence + ": POLARITY=" + str(line.sentiment.polarity))
+            i += 1
+    print(sentiment_scores)
+
+
 if __name__ == "__main__":
     # id_video(id="cpPG0bKHYKc")
     # nombre_de_commentaire()
@@ -372,4 +388,5 @@ if __name__ == "__main__":
     # proba_conditionnel_A_sachant_B(A="video", B="business intelligence")
     # pourcentage_sexe()
     # print(1)
-    dix_ngrams_les_plus_frequent()
+    # dix_ngrams_les_plus_frequent()
+    sentiment_polarity_pour_chaque_commentaire()

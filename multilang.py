@@ -9,4 +9,4 @@ print(reshaped_text)
 artext = get_display(reshaped_text)
 
 wordcloud = WordCloud().generate(artext)
-print(wor)
+
