@@ -16,10 +16,6 @@ from pandas import DataFrame
 import matplotlib.pyplot as plt
 from pymongo import MongoClient
 
-# import seaborn as sns
-#
-# sns.set(color_codes=True)
-
 # MongoDB Connection
 client = MongoClient('mongodb://localhost:27017/')
 db = client['modyoutubeproject']
@@ -216,15 +212,13 @@ def dix_phrase_nominal_les_plus_frequent():
         reshaped_text = arabic_reshaper.reshape(u'' + c)
         artext = get_display(reshaped_text)
         commentaires_dans_une_ligne += " " + artext.replace(".", " ")
-    # commentaires_dans_une_ligne = TextBlob(' '.join(commentaires))
-    # print(commentaires_dans_une_ligne.noun_phrases)
+    commentaires_dans_une_ligne = TextBlob(commentaires_dans_une_ligne)
     feature_count = dict()
     for phrase in commentaires_dans_une_ligne.noun_phrases:
         count = 0
         for word in phrase.split():
             if word not in stopwords.words('english'):
                 count += commentaires_dans_une_ligne.words.count(word)
-        # print(phrase + ": " + str(count))
         feature_count[phrase] = count
     df = DataFrame().from_dict(list(feature_count.items()))
     df.columns = ['termes', 'frequence']
@@ -278,74 +272,52 @@ def dix_ngrams_les_plus_frequent():
     plt.show()
 
 
+def frequence_par_terme(terme=" "):
+    comments = commentaire_de_mongodb()
+    comments = (nettoyer_la_phrase(p) for p in comments)
+    s = ""
+    for c in comments:
+        s += " " + c.replace(".", " ")
+    filtered_words = [word for word in s.split() if word not in stopwords.words('english')]
+    wordcount = Counter(filtered_words)
+    freq = 0
+    for k in wordcount.items():
+        if k[0] == terme or k[0] in terme or terme in k[0]:
+            freq += k[1]
+    return freq
+
+
+def frequence_cumul():
+    comments = commentaire_de_mongodb()
+    comments = (nettoyer_la_phrase(p) for p in comments)
+    s = ""
+    for c in comments:
+        s += " " + c.replace(".", " ")
+    filtered_words = [word for word in s.split() if word not in stopwords.words('english')]
+    wordcount = Counter(filtered_words)
+    freq_cum = 0
+    for k in wordcount.items():
+        freq_cum += k[1]
+    return freq_cum
+
+
 # Q4
 def frequence_par_terme_en_entree(terme=" "):
-    commentaires = commentaire_de_mongodb()
-    commentaires = (nettoyer_la_phrase(p) for p in commentaires)
-    commentaires_dans_une_ligne = ""
-    for c in commentaires:
-        # reshaped_text = arabic_reshaper.reshape(u'' + c)
-        # artext = get_display(reshaped_text)
-        commentaires_dans_une_ligne += " " + c.replace(".", " ")
-    feature_count = dict()
-    for phrase in commentaires_dans_une_ligne.noun_phrases:
-        count = 0
-        for word in phrase.split():
-            if word not in stopwords.words('english'):
-                count += commentaires_dans_une_ligne.words.count(word)
-        # print(phrase + ": " + str(count))
-        feature_count[phrase] = count
-    df = DataFrame().from_dict(list(feature_count.items()))
-    df.columns = ['termes', 'frequence']
-    df.sort_values('frequence', ascending=False, inplace=True)
-    freq = 0
-    for index, row in df.iterrows():
-        # print(row["termes"], row["frequence"])
-        if row["termes"] == terme or row["termes"] in terme or terme in row["termes"]:
-            # print(row["termes"], row["frequence"])
-            freq += int(row["frequence"])
+    freq = frequence_par_terme(terme)
     print("a - fréquence dans le dataset traité ", str(freq))
     print("b - moyenne cette expression est citée dans un commentaire " + str(freq / int(MAX_RESULT)))
 
 
 # Q5
-def proba_conditionnel_A_sachant_B(A="", B=""):
-    # on considere que A et B sont deux evenements independants
-    commentaires = commentaire_de_mongodb()
-    commentaires = (nettoyer_la_phrase(p) for p in commentaires)
-    commentaires_dans_une_ligne = ""
-    for c in commentaires:
-        # reshaped_text = arabic_reshaper.reshape(u'' + c)F
-        # artext = get_display(reshaped_text)
-        commentaires_dans_une_ligne += " " + c.replace(".", " ")
-    feature_count = dict()
-    for phrase in commentaires_dans_une_ligne.noun_phrases:
-        count = 0
-        for word in phrase.split():
-            if word not in stopwords.words('english'):
-                count += commentaires_dans_une_ligne.words.count(word)
-        # print(phrase + ": " + str(count))
-        feature_count[phrase] = count
-    df = DataFrame().from_dict(list(feature_count.items()))
-    df.columns = ['termes', 'frequence']
-    df.sort_values('frequence', ascending=False, inplace=True)
-    # print(df.items)
-    cumule_freq = 0
-    for index, row in df.iterrows():
-        cumule_freq += int(row["frequence"])
-    freq_A = 0
-    for index, row in df.iterrows():
-        if row["termes"] == A or row["termes"] in A or A in row["termes"]:
-            freq_A += int(row["frequence"])
-    freq_B = 0
-    for index, row in df.iterrows():
-        if row["termes"] == B or row["termes"] in B or B in row["termes"]:
-            freq_B += int(row["frequence"])
+def proba_conditionnel_A_sachant_B(E="", F=""):
+    freq_cumul = frequence_cumul()
+    freq_A = frequence_par_terme(E)
+    freq_B = frequence_par_terme(F)
     if freq_A == 0:
-        print("proba de B sachant A vaut : ", str("{0:.2f}".format(freq_B / cumule_freq)))
+        print("proba de B sachant A vaut : ", str("{0:.2f}".format(freq_B / freq_cumul)))
     else:
-        prob_AB = (freq_B / df.size) * (freq_A / cumule_freq)
-        print("proba de B sachant A vaut : ", str("{0:.2f}".format(prob_AB / (freq_A / cumule_freq))))
+        prob_AB = (freq_B / freq_cumul) * (freq_A / freq_cumul)
+        print("proba de B sachant A vaut : ", str("{0:.2f}".format(prob_AB / (freq_A / freq_cumul))))
 
 
 # Q6
@@ -369,12 +341,15 @@ def pourcentage_sexe():
             u += 1
         else:
             m += 1
+    # print(f)
+    # print(m)
+    # print(u)
     pourcentagef = float("{0:.2f}".format((f / (int(MAX_RESULT))) * 100))
     pourcentagem = float("{0:.2f}".format((m / (int(MAX_RESULT))) * 100))
     pourcentageu = float("{0:.2f}".format((u / (int(MAX_RESULT))) * 100))
     print("pourcentage des commentaires publiés par les femmes : " + str(pourcentagef) + "%")
-    print("pourcentage des commentaires publiés par les hommes : " + str(100 - pourcentagem) + "%")
-    print("pourcentage des commentaires publiés par les inconnus : " + str(100 - pourcentageu) + "%")
+    print("pourcentage des commentaires publiés par les hommes : " + str(pourcentagem) + "%")
+    print("pourcentage des commentaires publiés par les inconnus : " + str(pourcentageu) + "%")
 
 
 # sentence_polarity
@@ -404,15 +379,16 @@ def sentiment_polarity_pour_chaque_commentaire():
 
 
 if __name__ == "__main__":
-    # id_video(id="Szysv8eGTr4")# ARABE
+    # id_video(id="Szysv8eGTr4")  # ARABE
     # id_video(id="RiNZl7tEeoQ")# LATIN
     # nombre_de_commentaire()
     # commentaire_le_plus_populaire_du_premier_Q1()
     # dix_terme_les_plus_frequent()
-    # frequence_par_terme_en_entree(terme="video")
-    # proba_conditionnel_A_sachant_B(A="video", B="business intelligence")
+    # frequence_par_terme_en_entree(terme="الله")
+    # proba_conditionnel_A_sachant_B(E="الله", F="يا رب")
     # pourcentage_sexe()
     print()
     # dix_ngrams_les_plus_frequent()
     # sentiment_polarity_pour_chaque_commentaire()
     # dix_terme_les_plus_frequent()
+    dix_phrase_nominal_les_plus_frequent()
