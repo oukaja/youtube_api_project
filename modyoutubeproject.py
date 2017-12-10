@@ -7,15 +7,18 @@ from textblob import TextBlob
 from string import punctuation
 from collections import Counter
 import re
+from bidi.algorithm import get_display
+import arabic_reshaper
 from nltk.corpus import stopwords
 from nltk import word_tokenize
 from nltk.util import ngrams
 from pandas import DataFrame
 import matplotlib.pyplot as plt
 from pymongo import MongoClient
-import seaborn as sns
 
-sns.set(color_codes=True)
+# import seaborn as sns
+#
+# sns.set(color_codes=True)
 
 # MongoDB Connection
 client = MongoClient('mongodb://localhost:27017/')
@@ -206,11 +209,14 @@ def commentaire_le_plus_populaire_du_premier_Q1():
 
 # Q3 PHRASE NOMINAL
 def dix_phrase_nominal_les_plus_frequent():
-    commentaires = list()
-    for snippet_c_user in snippet_c:
-        commentaires.append(snippet_c_user["topLevelComment"]["snippet"]["textDisplay"])
+    commentaires = commentaire_de_mongodb()
     commentaires = (nettoyer_la_phrase(p) for p in commentaires)
-    commentaires_dans_une_ligne = TextBlob(' '.join(commentaires))
+    commentaires_dans_une_ligne = ""
+    for c in commentaires:
+        reshaped_text = arabic_reshaper.reshape(u'' + c)
+        artext = get_display(reshaped_text)
+        commentaires_dans_une_ligne += " " + artext.replace(".", " ")
+    # commentaires_dans_une_ligne = TextBlob(' '.join(commentaires))
     # print(commentaires_dans_une_ligne.noun_phrases)
     feature_count = dict()
     for phrase in commentaires_dans_une_ligne.noun_phrases:
@@ -234,13 +240,14 @@ def dix_terme_les_plus_frequent():
     comments = (nettoyer_la_phrase(p) for p in comments)
     s = ""
     for c in comments:
-        s += " " + c.replace(".", " ")
+        reshaped_text = arabic_reshaper.reshape(u'' + c)
+        artext = get_display(reshaped_text)
+        s += " " + artext.replace(".", " ")
     filtered_words = [word for word in s.split() if word not in stopwords.words('english')]
     wordcount = Counter(filtered_words)
     df = DataFrame.from_dict(wordcount, orient='index').reset_index().rename(
         columns={'index': 'termes', 0: 'frequence'})  # .set_index('word')
     df.sort_values('frequence', ascending=False, inplace=True)
-    # print(df)
     plt.style.use('ggplot')
     df.head(n=10).plot(x='termes', y='frequence', kind='bar')
     plt.show()
@@ -252,7 +259,9 @@ def dix_ngrams_les_plus_frequent():
     comments = (nettoyer_la_phrase(p) for p in comments)
     wordcount = dict()
     for c in comments:
-        token = word_tokenize(c.replace(".", ""))
+        reshaped_text = arabic_reshaper.reshape(u'' + c)
+        artext = get_display(reshaped_text)
+        token = word_tokenize(artext.replace(".", ""))
         bigrams = ngrams(token, 2)
         for gram in bigrams:
             g = gram[0] + " " + gram[1]
@@ -271,12 +280,13 @@ def dix_ngrams_les_plus_frequent():
 
 # Q4
 def frequence_par_terme_en_entree(terme=" "):
-    commentaires = list()
-    for snippet_c_user in snippet_c:
-        commentaires.append(snippet_c_user["topLevelComment"]["snippet"]["textDisplay"])
+    commentaires = commentaire_de_mongodb()
     commentaires = (nettoyer_la_phrase(p) for p in commentaires)
-    commentaires_dans_une_ligne = TextBlob(' '.join(commentaires))
-    # print(commentaires_dans_une_ligne.noun_phrases)
+    commentaires_dans_une_ligne = ""
+    for c in commentaires:
+        # reshaped_text = arabic_reshaper.reshape(u'' + c)
+        # artext = get_display(reshaped_text)
+        commentaires_dans_une_ligne += " " + c.replace(".", " ")
     feature_count = dict()
     for phrase in commentaires_dans_une_ligne.noun_phrases:
         count = 0
@@ -301,12 +311,13 @@ def frequence_par_terme_en_entree(terme=" "):
 # Q5
 def proba_conditionnel_A_sachant_B(A="", B=""):
     # on considere que A et B sont deux evenements independants
-    commentaires = list()
-    for snippet_c_user in snippet_c:
-        commentaires.append(snippet_c_user["topLevelComment"]["snippet"]["textDisplay"])
+    commentaires = commentaire_de_mongodb()
     commentaires = (nettoyer_la_phrase(p) for p in commentaires)
-    commentaires_dans_une_ligne = TextBlob(' '.join(commentaires))
-    # print(commentaires_dans_une_ligne.noun_phrases)
+    commentaires_dans_une_ligne = ""
+    for c in commentaires:
+        # reshaped_text = arabic_reshaper.reshape(u'' + c)F
+        # artext = get_display(reshaped_text)
+        commentaires_dans_une_ligne += " " + c.replace(".", " ")
     feature_count = dict()
     for phrase in commentaires_dans_une_ligne.noun_phrases:
         count = 0
@@ -366,6 +377,7 @@ def pourcentage_sexe():
     print("pourcentage des commentaires publiés par les inconnus : " + str(100 - pourcentageu) + "%")
 
 
+# sentence_polarity
 def sentiment_polarity_pour_chaque_commentaire():
     result = commentaire_de_mongodb()
     sentiment_scores = list()
@@ -374,19 +386,33 @@ def sentiment_polarity_pour_chaque_commentaire():
         line = TextBlob(sentence)
         sentiment_scores.append(line.sentiment.polarity)
         if i <= 10:
-            # print(sentence + ": POLARITY=" + str(line.sentiment.polarity))
             i += 1
-    print(sentiment_scores)
+    occu = dict()
+    for sent in sentiment_scores:
+        count = 0
+        sent = "{0:.2f}".format(sent)
+        # print(sent)
+        if sent not in occu:
+            occu[sent] = 1
+        else:
+            occu[sent] += 1
+    df = DataFrame().from_dict(occu, orient='index').reset_index().rename(columns={'index': 'polarity', 0: 'counter'})
+    # print(df)
+    plt.style.use('ggplot')
+    df.plot(x='polarity', y='counter', kind='bar')
+    plt.show()
 
 
 if __name__ == "__main__":
-    # id_video(id="cpPG0bKHYKc")
+    # id_video(id="Szysv8eGTr4")# ARABE
+    # id_video(id="RiNZl7tEeoQ")# LATIN
     # nombre_de_commentaire()
     # commentaire_le_plus_populaire_du_premier_Q1()
     # dix_terme_les_plus_frequent()
     # frequence_par_terme_en_entree(terme="video")
     # proba_conditionnel_A_sachant_B(A="video", B="business intelligence")
     # pourcentage_sexe()
-    # print(1)
+    print()
     # dix_ngrams_les_plus_frequent()
-    sentiment_polarity_pour_chaque_commentaire()
+    # sentiment_polarity_pour_chaque_commentaire()
+    # dix_terme_les_plus_frequent()
